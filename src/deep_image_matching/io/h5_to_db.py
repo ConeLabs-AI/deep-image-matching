@@ -25,9 +25,10 @@ import h5py
 import numpy as np
 from PIL import ExifTags, Image
 from tqdm import tqdm
+import yaml
 
-from .. import logger
-from ..utils.database import COLMAPDatabase, image_ids_to_pair_id
+from deep_image_matching import logger
+from deep_image_matching.utils.database import COLMAPDatabase, image_ids_to_pair_id
 
 default_camera_options = {
     "general": {
@@ -87,12 +88,12 @@ def export_to_colmap(
             raw_match_path,
             fname_to_id,
         )
-    if match_path.exists():
-        add_matches(
-            db,
-            match_path,
-            fname_to_id,
-        )
+    # if match_path.exists():
+    #     add_matches(
+    #         db,
+    #         match_path,
+    #         fname_to_id,
+    #     )
 
     db.commit()
     return
@@ -341,67 +342,42 @@ def add_matches(db, h5_path, fname_to_id):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+
     parser.add_argument(
-        "h5_path", help=("Path to the directory with " "keypoints.h5 and matches.h5")
+        "--h5_path", help=("Path to the directory with " "keypoints.h5 and matches.h5")
     )
-    parser.add_argument("image_path", help="Path to source images")
+
+    parser.add_argument("--image_path", help="Path to source images")
+
     parser.add_argument(
-        "--image-extension",
-        default=".jpg",
-        type=str,
-        help="Extension of files in image_path",
-    )
-    parser.add_argument(
-        "--database-path",
+        "--database_path",
         default="database.db",
         help="Location where the COLMAP .db file will be created",
     )
+
     parser.add_argument(
-        "--single-camera",
-        action="store_true",
-        help=(
-            "Consider all photos to be made with a single camera (COLMAP "
-            "will reduce the number of degrees of freedom"
-        ),
-    )
-    parser.add_argument(
-        "--camera-model",
-        choices=["simple-pinhole", "pinhole", "simple-radial", "opencv"],
-        default="simple-radial",
-        help=(
-            "Camera model to use in COLMAP. "
-            "See https://github.com/colmap/colmap/blob/master/src/base/camera_models.h"
-            " for explanations"
-        ),
+        "--camera_options",
+        default="config/cameras.yaml",
+        help="Location where the COLMAP .db file will be created",
     )
 
     args = parser.parse_args()
 
-    if args.camera_model == "opencv" and not args.single_camera:
-        raise RuntimeError(
-            "Cannot use --camera-model=opencv camera without "
-            "--single-camera (the COLMAP optimisation will "
-            "likely fail to converge)"
-        )
+    with open(args.camera_options, "r") as file:
+        camera_options = yaml.safe_load(file)
 
     if os.path.exists(args.database_path):
         raise RuntimeError("database path already exists - will not modify it.")
 
-    db = COLMAPDatabase.connect(args.database_path)
-    db.create_tables()
+    database_path = Path(args.database_path)
+    feature_path = Path(args.h5_path) / "features.h5"
+    match_path = Path(args.h5_path) / "raw_matches.h5"
+    imgs_dir = Path(args.image_path)
 
-    fname_to_id = add_keypoints(
-        db,
-        args.h5_path,
-        args.image_path,
-        args.image_extension,
-        args.camera_model,
-        args.single_camera,
+    export_to_colmap(
+        img_dir=imgs_dir,
+        feature_path=feature_path,
+        match_path=match_path,
+        database_path=database_path,
+        camera_options=camera_options,
     )
-    add_matches(
-        db,
-        args.h5_path,
-        fname_to_id,
-    )
-
-    db.commit()

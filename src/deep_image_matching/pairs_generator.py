@@ -28,7 +28,15 @@ def pairs_from_sequential(
             im1 = img_list[i]
             im2 = img_list[j]
             pairs.append((im1, im2))
-    return pairs
+    
+    for i in range(len(img_list)):
+        for k in range(0, len(img_list), overlap*2):
+            im1 = img_list[i]
+            im2 = img_list[k]
+            pairs.append((im1, im2))
+
+    pairs_out = set(tuple(sorted(l)) for l in pairs)
+    return pairs_out
 
 
 def pairs_from_bruteforce(img_list: List[Union[str, Path]]) -> List[tuple]:

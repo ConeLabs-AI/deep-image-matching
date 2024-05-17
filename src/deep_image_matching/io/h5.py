@@ -47,45 +47,55 @@ def get_features(
     as_tensor: bool = False,
     device: torch.device = torch.device("cuda"),
 ) -> dict:
-    with h5py.File(str(path), "r", libver="latest") as fd:
-        if name in fd:
-            try:
-                kpts = np.array(fd[name]["keypoints"]).astype(np.float32)
-                descr = np.array(fd[name]["descriptors"]).astype(np.float32)
+    all_h5_files = [file for file in path.glob('./*') if "h5" in Path(file).suffix]
+    for feature_file in all_h5_files:
+        with h5py.File(str(feature_file), "r", libver="latest") as fd:
+            if name in fd:
+                try:
+                    kpts = np.array(fd[name]["keypoints"]).astype(np.float32)
+                    descr = np.array(fd[name]["descriptors"]).astype(np.float32)
+                    scales=None
+                    if "scales" in fd[name]:
+                        scales = np.array(fd[name]["scales"]).astype(np.float32)
+                    oris=None
+                    if "oris" in fd[name]:
+                        oris = np.array(fd[name]["oris"]).astype(np.float32)
 
-            except KeyError:
-                raise KeyError(f"Cannot find keypoints and descriptors in {path}")
+                except KeyError:
+                    raise KeyError(f"Cannot find keypoints and descriptors in {path}")
 
-            feats = {
-                "keypoints": kpts,
-                "descriptors": descr,
-            }
+                feats = {
+                    "keypoints": kpts,
+                    "descriptors": descr,
+                    "scales": scales,
+                    "oris": oris,
+                }
 
-            if "feature_path" in fd[name]:
-                feats["feature_path"] = fd[name]["feature_path"][()].decode("utf-8")
-            if "im_path" in fd[name]:
-                feats["im_path"] = fd[name]["im_path"][()].decode("utf-8")
+                if "feature_path" in fd[name]:
+                    feats["feature_path"] = fd[name]["feature_path"][()].decode("utf-8")
+                if "im_path" in fd[name]:
+                    feats["im_path"] = fd[name]["im_path"][()].decode("utf-8")
 
-            for k in ["tile_idx", "scores"]:
+                for k in ["tile_idx", "scores"]:
+                    if k in fd[name]:
+                        feats[k] = np.array(fd[name][k]).astype(np.float32)
+                    else:
+                        logger.warning(f"Cannot find {k} in {path}")
+                k = "image_size"
                 if k in fd[name]:
-                    feats[k] = np.array(fd[name][k]).astype(np.float32)
-                else:
-                    logger.warning(f"Cannot find {k} in {path}")
-            k = "image_size"
-            if k in fd[name]:
-                feats[k] = np.array(fd[name][k]).astype(np.int32)
-        else:
-            raise ValueError(f"Cannot find image {name} in {path}")
+                    feats[k] = np.array(fd[name][k]).astype(np.int32)
+            else:
+                raise ValueError(f"Cannot find image {name} in {path}")
 
-        if as_tensor:
-            if device.type == "cuda" and not torch.cuda.is_available():
-                device = torch.device("cpu")
-            feats = {
-                k: torch.tensor(v, dtype=torch.float, device=device)
-                for k, v in feats.items()
-            }
+            if as_tensor:
+                if device.type == "cuda" and not torch.cuda.is_available():
+                    device = torch.device("cpu")
+                feats = {
+                    k: torch.tensor(v, dtype=torch.float, device=device)
+                    for k, v in feats.items()
+                }
 
-        return feats
+            return feats
 
 
 def get_keypoints(

@@ -359,6 +359,11 @@ class LightGlue(nn.Module):
             "input_dim": 128,
             "add_scale_ori": True,
         },
+        "doghardnet": {
+            "weights": "doghardnet_lightglue",
+            "input_dim": 128,
+            "add_scale_ori": True,
+        },
     }
 
     def __init__(self, features="superpoint", **conf) -> None:
@@ -433,6 +438,7 @@ class LightGlue(nn.Module):
                 stacklevel=2,
             )
 
+        torch._inductor.cudagraph_mark_step_begin()
         for i in range(self.conf.n_layers):
             self.transformers[i].masked_forward = torch.compile(
                 self.transformers[i].masked_forward, mode=mode, fullgraph=True
@@ -454,12 +460,15 @@ class LightGlue(nn.Module):
                 descriptors: [B x N x D]
                 image: [B x C x H x W] or image_size: [B x 2]
         Output (dict):
-            log_assignment: [B x M+1 x N+1]
             matches0: [B x M]
             matching_scores0: [B x M]
             matches1: [B x N]
             matching_scores1: [B x N]
-            matches: List[[Si x 2]], scores: List[[Si]]
+            matches: List[[Si x 2]]
+            scores: List[[Si]]
+            stop: int
+            prune0: [B x M]
+            prune1: [B x N]
         """
         with torch.autocast(enabled=self.conf.mp, device_type="cuda"):
             return self._forward(data)

@@ -27,6 +27,20 @@ def parse_cli() -> dict:
         help="Folder containing images to process. If not specified, an 'images' folder inside the project folder is assumed.",
         default=None,
     )
+    
+    parser.add_argument(
+        "--mask_path",
+        type=str,
+        help="Folder containing masks to process.",
+        default=""
+    )
+
+    parser.add_argument(
+        "--img_list_path",
+        type=str,
+        help="Folder containing masks to process.",
+        default=None
+    )
     # parser.add_argument(
     #     "-o",
     #     "--outs",
@@ -77,8 +91,9 @@ def parse_cli() -> dict:
             "retrieval",
             "custom_pairs",
             "covisibility",
+            "none"
         ],
-        default="matching_lowres",
+        default="none",
         help="Matching strategy",
     )
     parser.add_argument(

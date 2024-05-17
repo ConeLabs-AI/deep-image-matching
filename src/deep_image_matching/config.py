@@ -135,6 +135,19 @@ confs = {
             "filter_threshold": 0.1,  # match threshold
         },
     },
+    "doghardnet+lightglue": {
+        "extractor": {
+            "name": "doghardnet",
+            "max_num_keypoints": 12000,
+        },
+        "matcher": {
+            "name": "lightglue",
+            "n_layers": 9,
+            "depth_confidence": -1,  # early stopping, disable with -1
+            "width_confidence": -1,  # point pruning, disable with -1
+            "filter_threshold": 0.1,  # match threshold
+        },
+    },
     "orb+kornia_matcher": {
         "extractor": {
             "name": "orb",
@@ -188,6 +201,7 @@ opt_zoo = {
         "orb",
         "sift",
         "no_extractor",
+        "doghardnet",
     ],
     "matchers": [
         "superglue",
@@ -206,6 +220,7 @@ opt_zoo = {
         "custom_pairs",
         "matching_lowres",
         "covisibility",
+        "none",
     ],
 }
 
@@ -244,12 +259,14 @@ class Config:
         "gui": False,
         "dir": None,
         "images": None,
+        "mask_path": "",
+        "img_list_path": None,
         "outs": None,
         "pipeline": None,
         "config_file": None,
         "quality": "high",
         "tiling": "none",
-        "strategy": "matching_lowres",
+        "strategy": "none",
         "pair_file": None,
         "overlap": None,
         "global_feature": None,
@@ -412,21 +429,29 @@ class Config:
         if args["outs"] is None:
             args["outs"] = (
                 args["dir"]
-                / f"results_{args['pipeline']}_{args['strategy']}_quality_{args['quality']}"
+                / f"results_{args['pipeline']}"
             )
 
         if args["outs"].exists():
             if args["force"]:
                 logger.warning(
-                    f"{args['outs']} already exists, but the '--force' option is used. Deleting the folder."
+                    f"{args['outs']} already exists, but the '--force' option is used. Using Exisitng Data."
                 )
-                shutil.rmtree(args["outs"])
+                # shutil.rmtree(args["outs"])
             else:
                 logger.warning(
                     f"{args['outs']} already exists. Use '--force' option to overwrite the folder. Using existing features is not yet fully implemented (it will be implemented in a future release). Exiting."
                 )
                 exit(1)
         args["outs"].mkdir(parents=True, exist_ok=True)
+        features_dir = Path(args["outs"]) / "features"
+        matches_dir = Path(args["outs"]) / "matches"
+        raw_matches_dir = Path(args["outs"]) / "raw_matches"
+        
+        args["outs"].mkdir(parents=True, exist_ok=True)
+        features_dir.mkdir(parents=True, exist_ok=True)
+        matches_dir.mkdir(parents=True, exist_ok=True)
+        raw_matches_dir.mkdir(parents=True, exist_ok=True)
 
         # Check extraction and matching configuration
         if args["pipeline"] is None or args["pipeline"] not in confs:
@@ -519,6 +544,8 @@ class Config:
             "output_dir": args["outs"],
             "quality": Quality[args["quality"].upper()],
             "tile_selection": TileSelection[args["tiling"].upper()],
+            "mask_path": args["mask_path"],
+            "img_list_path": args["img_list_path"],
             "matching_strategy": args["strategy"],
             "retrieval": args["global_feature"],
             "pair_file": args["pair_file"],

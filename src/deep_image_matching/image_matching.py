@@ -87,6 +87,7 @@ class ImageMatching:
         # TODO: add default values for not necessary parameters
         self,
         imgs_dir: Path,
+        img_list_path: None,
         output_dir: Path,
         matching_strategy: str,
         local_features: str,
@@ -125,6 +126,7 @@ class ImageMatching:
         """
         self.image_dir = Path(imgs_dir)
         self.output_dir = Path(output_dir)
+        self.img_list_path = Path(img_list_path)
         self.matching_strategy = matching_strategy
         self.retrieval_option = retrieval_option
         self.local_features = local_features
@@ -165,8 +167,9 @@ class ImageMatching:
                         f"File {self.existing_colmap_model} does not exist"
                     )
 
+        self.pair_filename = self.pair_file.stem
         # Initialize ImageList class
-        self.image_list = ImageList(imgs_dir)
+        self.image_list = ImageList(imgs_dir, img_list_path)
         images = self.image_list.img_names
         if len(images) == 0:
             raise ValueError(f"Image folder empty. Supported formats: {self.image_ext}")
@@ -355,7 +358,7 @@ class ImageMatching:
         # Update image directory to the dir with upright images
         # Features will be rotate accordingly on exporting, if the images have been rotated
         self.image_dir = path_to_upright_dir
-        self.image_list = ImageList(path_to_upright_dir)
+        self.image_list = ImageList(path_to_upright_dir, self.img_list_path)
         images = self.image_list.img_names
 
         torch.cuda.empty_cache()
@@ -410,7 +413,8 @@ class ImageMatching:
             raise ValueError(f"Feature path {feature_path} does not exist")
 
         # Define matches path
-        matches_path = feature_path.parent / "matches.h5"
+        matches_path = self.output_dir / "matches" / f"matches_{self.pair_filename}.h5"
+        raw_matches_path = self.output_dir / "raw_matches" / f"raw_matches_{self.pair_filename}.h5"
 
         # Match pairs
         logger.info("Matching features...")
@@ -425,8 +429,9 @@ class ImageMatching:
 
             # Run matching
             self._matcher.match(
-                feature_path=feature_path,
+                feature_dir=feature_path,
                 matches_path=matches_path,
+                raw_matches_path=raw_matches_path,
                 img0=im0,
                 img1=im1,
                 try_full_image=try_full_image,

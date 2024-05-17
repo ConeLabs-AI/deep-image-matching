@@ -27,6 +27,8 @@ class FeaturesDict(TypedDict):
     scores: Optional[np.ndarray]
     lafs: Optional[np.ndarray]
     tile_idx: Optional[np.ndarray]
+    scales: Optional[np.ndarray]
+    oris: Optional[np.ndarray]
 
 
 def matcher_loader(root, model):
@@ -202,8 +204,9 @@ class MatcherBase(metaclass=ABCMeta):
 
     def match(
         self,
-        feature_path: Path,
+        feature_dir: Path,
         matches_path: Path,
+        raw_matches_path: Path,
         img0: Path,
         img1: Path,
         try_full_image: bool = False,
@@ -228,16 +231,16 @@ class MatcherBase(metaclass=ABCMeta):
         timer_match = Timer(log_level="debug")
 
         # Check that feature_path exists
-        if not Path(feature_path).exists():
-            raise FileNotFoundError(f"Feature file {feature_path} does not exist.")
+        if not Path(feature_dir).exists():
+            raise FileNotFoundError(f"Feature file {feature_dir} does not exist.")
         else:
-            self._feature_path = Path(feature_path)
+            self._feature_dir = Path(feature_dir)
 
         # Get features from h5 file
         img0_name = img0.name
         img1_name = img1.name
-        features0 = get_features(self._feature_path, img0.name)
-        features1 = get_features(self._feature_path, img1.name)
+        features0 = get_features(self._feature_dir, img0.name)
+        features1 = get_features(self._feature_dir, img1.name)
         timer_match.update("load h5 features")
 
         # Perform matching (on tiles or full images)
@@ -297,7 +300,7 @@ class MatcherBase(metaclass=ABCMeta):
             timer_match.update("tile matching")
 
         # Save to h5 file
-        raw_matches_path = matches_path.parent / "raw_matches.h5"
+        # raw_matches_path = matches_path.parent / "raw_matches.h5"
         with h5py.File(str(raw_matches_path), "a", libver="latest") as fd:
             group = fd.require_group(img0_name)
             group.create_dataset(img1_name, data=matches)

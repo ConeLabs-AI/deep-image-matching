@@ -85,7 +85,7 @@ class Image:
     DATETIME_FMT = "%Y:%m:%d %H:%M:%S"
     DATE_FORMATS = [DATETIME_FMT, DATE_FMT, TIME_FMT]
 
-    def __init__(self, path: Union[str, Path], id: int = None) -> None:
+    def __init__(self, path: Union[str, Path], id: int = None, img_list_file: str = None) -> None:
         """
         __init__ Create Image object as a lazy loader for image data
 
@@ -106,6 +106,7 @@ class Image:
         self._exif_data = None
         self._date_time = None
         self._focal_length = None
+        self._img_list_file = img_list_file
 
         try:
             self.read_exif()
@@ -142,6 +143,11 @@ class Image:
     def path(self) -> Path:
         """Path of the image"""
         return self._path
+
+    @property
+    def img_list_file(self) -> Path:
+        """Path of the image"""
+        return self._img_list_file
 
     @property
     def parent(self) -> str:
@@ -396,7 +402,7 @@ class ImageList:
 
     IMAGE_EXT = IMAGE_EXT
 
-    def __init__(self, img_dir: Path):
+    def __init__(self, img_dir: Path,  img_list: Path):
         """
         Initializes an ImageList object
 
@@ -416,16 +422,26 @@ class ImageList:
         self.images = []
         self.current_idx = 0
         i = 0
-        all_imgs = [
-            image for image in img_dir.glob("*") if image.suffix in self.IMAGE_EXT
-        ]
+
+        all_imgs = []
+        if img_list is not None:
+            self.img_list_file = Path(img_list).stem
+            with open(img_list) as file:
+                lines = [line.rstrip() for line in file]
+            all_imgs = [
+                img_dir / image for image in lines if Path(image).suffix in self.IMAGE_EXT
+            ]
+        else: 
+            all_imgs = [
+                image for image in img_dir.glob("*") if image.suffix in self.IMAGE_EXT
+            ]
         all_imgs.sort()
 
         if len(all_imgs) == 0:
             raise ValueError(f"{img_dir} does not contain any image")
 
         for image in all_imgs:
-            self.add_image(image, i)
+            self.add_image(image, i, self.img_list_file)
             i += 1
 
     def __len__(self):
@@ -447,7 +463,7 @@ class ImageList:
         self.current_idx += 1
         return self.images[cur]
 
-    def add_image(self, path: Path, img_id: int):
+    def add_image(self, path: Path, img_id: int, img_list_file: str = None):
         """
         Adds a new Image object to the ImageList.
 
@@ -455,7 +471,7 @@ class ImageList:
             path (Path): The path to the image file.
             img_id (int): The ID to assign to the image.
         """
-        new_image = Image(path, img_id)
+        new_image = Image(path, img_id, img_list_file)
         self.images.append(new_image)
 
     @property

@@ -7,6 +7,7 @@ import cv2
 import h5py
 import numpy as np
 import torch
+import os
 
 from .. import Quality, TileSelection, get_size_by_quality, logger
 from ..utils.image import Image, resize_image
@@ -19,6 +20,8 @@ class FeaturesDict(TypedDict):
     scores: Optional[np.ndarray]
     lafs: Optional[np.ndarray]
     tile_idx: Optional[np.ndarray]
+    scales: Optional[np.ndarray]
+    oris: Optional[np.ndarray]
 
 
 def extractor_loader(root, model):
@@ -185,7 +188,7 @@ class ExtractorBase(metaclass=ABCMeta):
             raise ValueError(f"Image {im_path} does not exist")
 
         output_dir = Path(self._config["general"]["output_dir"])
-        feature_path = output_dir / "features.h5"
+        feature_path = output_dir / "features" / f"features_{Path(img.img_list_file).stem}.h5"
 
         # Load image
         image = cv2.imread(str(im_path))
@@ -197,9 +200,20 @@ class ExtractorBase(metaclass=ABCMeta):
         # Resize images if needed
         image_ = self._resize_image(self._quality, image, interp=self.interp)
 
+        mask_img = []
+        if self._config["general"]["mask_path"] != "":
+            mask_img = cv2.imread(os.path.join(self._config["general"]["mask_path"], os.path.basename(f"{str(im_path)}.png")))
+            mask_img = cv2.cvtColor(mask_img, cv2.COLOR_BGR2GRAY)
+
         if self._config["general"]["tile_selection"] == TileSelection.NONE:
             # Extract features from the whole image
             features = self._extract(image_)
+            del_idx = [feat_idx for feat_idx, pix_cord in enumerate(np.round(features['keypoints'])) if mask_img[int(pix_cord[1]), int(pix_cord[0])] < 255]
+            for item in features:
+                if item == "descriptors":
+                    features[item] = np.delete(features[item], del_idx, 1)
+                else:
+                    features[item] = np.delete(features[item], del_idx, 0)
             # features["feature_path"] = str(feature_path)
             # features["im_path"] = str(im_path)
             features["tile_idx"] = np.zeros(
