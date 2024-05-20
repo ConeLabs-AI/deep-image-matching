@@ -123,22 +123,22 @@ confs = {
         "extractor": {
             "name": "aliked",
             "model_name": "aliked-n16rot",
-            "max_num_keypoints": 4000,
+            "max_num_keypoints": 24000,
             "detection_threshold": 0.2,
             "nms_radius": 3,
         },
         "matcher": {
             "name": "lightglue",
             "n_layers": 9,
-            "depth_confidence": 0.95,  # early stopping, disable with -1
-            "width_confidence": 0.99,  # point pruning, disable with -1
+            "depth_confidence": -1,  # early stopping, disable with -1
+            "width_confidence": -1,  # point pruning, disable with -1
             "filter_threshold": 0.1,  # match threshold
         },
     },
     "doghardnet+lightglue": {
         "extractor": {
             "name": "doghardnet",
-            "max_num_keypoints": 12000,
+            "max_num_keypoints": 10000,
         },
         "matcher": {
             "name": "lightglue",

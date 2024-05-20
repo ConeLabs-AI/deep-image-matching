@@ -43,11 +43,11 @@ class AlikedExtractor(ExtractorBase):
             self._extractor = ALIKED(**cfg)
 
     @torch.no_grad()
-    def _extract(self, image: np.ndarray) -> np.ndarray:
+    def _extract(self, image: np.ndarray, mask: np.ndarray=None) -> np.ndarray:
         image_ = self._frame2tensor(image, self._device)
 
         # Extract features
-        feats = self._extractor({"image": image_})
+        feats = self._extractor({"image": image_, "mask": torch.tensor(np.array([[mask]])).to(self._device)})
 
         # Remove batch dimension from elements in feats
         feats = self._rbd(feats)

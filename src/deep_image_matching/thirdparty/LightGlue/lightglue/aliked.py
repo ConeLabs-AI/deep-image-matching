@@ -41,6 +41,7 @@ from kornia.color import grayscale_to_rgb
 from torch import nn
 from torch.nn.modules.utils import _pair
 from torchvision.models import resnet
+import numpy as np 
 
 from .utils import Extractor
 
@@ -129,6 +130,7 @@ class DKD(nn.Module):
         scores_map: torch.Tensor,
         sub_pixel: bool = True,
         image_size: Optional[torch.Tensor] = None,
+        feature_mask: np.ndarray = None
     ):
         """
         :param scores_map: Bx1xHxW
@@ -158,7 +160,7 @@ class DKD(nn.Module):
             indices_keypoints = [topk.indices[i] for i in range(b)]  # B x top_k
         else:
             if self.scores_th > 0:
-                masks = nms_scores > self.scores_th
+                masks = torch.logical_and(nms_scores > self.scores_th, feature_mask)
                 if masks.sum() == 0:
                     th = scores_nograd.reshape(b, -1).mean(dim=1)  # th = self.scores_th
                     masks = nms_scores > th.reshape(b, 1, 1, 1)
@@ -739,11 +741,13 @@ class ALIKED(Extractor):
 
     def forward(self, data: dict) -> dict:
         image = data["image"]
+        mask = data["mask"]
         if image.shape[1] == 1:
+            print('here')
             image = grayscale_to_rgb(image)
         feature_map, score_map = self.extract_dense_map(image)
         keypoints, kptscores, scoredispersitys = self.dkd(
-            score_map, image_size=data.get("image_size")
+            score_map, image_size=data.get("image_size"), feature_mask=mask
         )
         descriptors, offsets = self.desc_head(feature_map, keypoints)
 

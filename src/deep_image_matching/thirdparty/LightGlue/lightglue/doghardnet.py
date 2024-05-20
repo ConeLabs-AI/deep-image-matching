@@ -13,6 +13,7 @@ class DoGHardNet(SIFT):
 
     def forward(self, data: dict) -> dict:
         image = data["image"]
+        mask = data["mask"]
         if image.shape[1] == 3:
             image = rgb_to_grayscale(image)
         device = image.device
@@ -28,7 +29,7 @@ class DoGHardNet(SIFT):
             if im_size is not None:
                 w, h = data["image_size"][k]
                 img = img[:, : h.to(torch.int32), : w.to(torch.int32)]
-            p = self.extract_single_image(img)
+            p = self.extract_single_image(img, mask)
             lafs = laf_from_center_scale_ori(
                 p["keypoints"].reshape(1, -1, 2),
                 6.0 * p["scales"].reshape(1, -1, 1, 1),

@@ -369,7 +369,7 @@ class MatcherBase(metaclass=ABCMeta):
             viz_dir = self._output_dir / "debug" / "matches"
             viz_dir.mkdir(parents=True, exist_ok=True)
             self.viz_matches(
-                feature_path,
+                feature_dir,
                 matches_path,
                 img0,
                 img1,

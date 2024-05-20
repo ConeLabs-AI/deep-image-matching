@@ -46,11 +46,11 @@ class DoGHardNetExtractor(ExtractorBase):
             self._extractor = DoGHardNet(**cfg)
 
     @torch.no_grad()
-    def _extract(self, image: np.ndarray) -> np.ndarray:
+    def _extract(self, image: np.ndarray, mask: np.ndarray) -> np.ndarray:
         image_ = self._frame2tensor(image, self._device)
 
         # Extract features
-        feats = self._extractor({"image": image_})
+        feats = self._extractor({"image": image_, "mask": mask})
 
         # Remove batch dimension from elements in feats
         feats = self._rbd(feats)

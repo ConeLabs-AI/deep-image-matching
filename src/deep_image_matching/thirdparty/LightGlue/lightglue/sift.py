@@ -1,4 +1,5 @@
 import warnings
+import random
 
 import cv2
 import numpy as np
@@ -56,7 +57,7 @@ def sift_to_rootsift(x: torch.Tensor, eps=1e-6) -> torch.Tensor:
     return torch.nn.functional.normalize(x, p=2, dim=-1, eps=eps)
 
 
-def run_opencv_sift(features: cv2.Feature2D, image: np.ndarray) -> np.ndarray:
+def run_opencv_sift(features: cv2.Feature2D, image: np.ndarray, mask: np.ndarray) -> np.ndarray:
     """
     Detect keypoints using OpenCV Detector.
     Optionally, perform description.
@@ -68,7 +69,14 @@ def run_opencv_sift(features: cv2.Feature2D, image: np.ndarray) -> np.ndarray:
         scores: 1D array of responses
         descriptors: 1D array of descriptors
     """
-    detections, descriptors = features.detectAndCompute(image, None)
+    detections, descriptors = features.detectAndCompute(image, mask)
+    print(np.array(detections).shape)
+    print(np.array(descriptors).shape)
+    if len(detections)>10000:
+        del_idx = random.sample(range(0, len(detections)), len(detections)-10000)
+        detections = np.delete(np.array(detections), del_idx, 0)
+        descriptors = np.delete(np.array(descriptors), del_idx, 0)
+
     points = np.array([k.pt for k in detections], dtype=np.float32)
     scores = np.array([k.response for k in detections], dtype=np.float32)
     scales = np.array([k.size for k in detections], dtype=np.float32)
@@ -127,7 +135,7 @@ class SIFT(Extractor):
         elif backend == "opencv":
             self.sift = cv2.SIFT_create(
                 contrastThreshold=self.conf.detection_threshold,
-                nfeatures=self.conf.max_num_keypoints,
+                nfeatures=50000,
                 edgeThreshold=self.conf.edge_threshold,
                 nOctaveLayers=self.conf.num_octaves,
             )
@@ -137,7 +145,7 @@ class SIFT(Extractor):
                 f"Unknown backend: {backend} not in " f"{{{','.join(backends)}}}."
             )
 
-    def extract_single_image(self, image: torch.Tensor):
+    def extract_single_image(self, image: torch.Tensor, mask: np.ndarray):
         image_np = image.cpu().numpy().squeeze(0)
 
         if self.conf.backend.startswith("pycolmap"):
@@ -156,7 +164,7 @@ class SIFT(Extractor):
         elif self.conf.backend == "opencv":
             # TODO: Check if opencv keypoints are already in corner convention
             keypoints, scores, scales, angles, descriptors = run_opencv_sift(
-                self.sift, (image_np * 255.0).astype(np.uint8)
+                self.sift, (image_np * 255.0).astype(np.uint8), mask
             )
         pred = {
             "keypoints": keypoints,

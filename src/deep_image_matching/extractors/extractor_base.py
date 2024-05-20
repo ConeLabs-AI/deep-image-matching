@@ -204,16 +204,23 @@ class ExtractorBase(metaclass=ABCMeta):
         if self._config["general"]["mask_path"] != "":
             mask_img = cv2.imread(os.path.join(self._config["general"]["mask_path"], os.path.basename(f"{str(im_path)}.png")))
             mask_img = cv2.cvtColor(mask_img, cv2.COLOR_BGR2GRAY)
+            mask_img = self._resize_image(self._quality, mask_img, interp=self.interp)
+            # ret, mask_img_thres = cv2.threshold(mask_img, 127, 255, cv2.THRESH_BINARY)
+            mask_img_thres = mask_img>127
 
         if self._config["general"]["tile_selection"] == TileSelection.NONE:
             # Extract features from the whole image
-            features = self._extract(image_)
-            del_idx = [feat_idx for feat_idx, pix_cord in enumerate(np.round(features['keypoints'])) if mask_img[int(pix_cord[1]), int(pix_cord[0])] < 255]
-            for item in features:
-                if item == "descriptors":
-                    features[item] = np.delete(features[item], del_idx, 1)
-                else:
-                    features[item] = np.delete(features[item], del_idx, 0)
+            features = self._extract(image_, mask_img_thres)
+            
+            # Retrieve original image coordinates if matching was performed on up/down-sampled images
+            features = self._resize_features(self._quality, features)
+            
+            # del_idx = [feat_idx for feat_idx, pix_cord in enumerate(features['keypoints']) if mask_img[int(pix_cord[1]), int(pix_cord[0])] < 255]
+            # for item in features:
+            #     if item == "descriptors":
+            #         features[item] = np.delete(features[item], del_idx, 1)
+            #     else:
+            #         features[item] = np.delete(features[item], del_idx, 0)
             # features["feature_path"] = str(feature_path)
             # features["im_path"] = str(im_path)
             features["tile_idx"] = np.zeros(
@@ -226,9 +233,6 @@ class ExtractorBase(metaclass=ABCMeta):
             # features["feature_path"] = str(feature_path)
             # features["im_path"] = str(im_path)
         logger.debug(f"Extracted {len(features['keypoints'])} keypoints")
-
-        # Retrieve original image coordinates if matching was performed on up/down-sampled images
-        features = self._resize_features(self._quality, features)
 
         # Add the image_size to the features (if not already present)
         features["image_size"] = np.array(image.shape[:2])
@@ -246,6 +250,10 @@ class ExtractorBase(metaclass=ABCMeta):
             viz_dir = output_dir / "debug" / "keypoints"
             viz_dir.mkdir(parents=True, exist_ok=True)
             image = cv2.imread(str(im_path))
+
+            masks_dir = output_dir / "debug" / "masks"
+            masks_dir.mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(masks_dir / im_path.name) , mask_img)
             self.viz_keypoints(
                 image,
                 features["keypoints"],

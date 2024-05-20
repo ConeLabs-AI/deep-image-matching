@@ -80,14 +80,20 @@ def export_to_colmap(
 
     db = COLMAPDatabase.connect(database_path)
     db.create_tables()
-    fname_to_id = add_keypoints(db, feature_path, img_dir, camera_options)
-    raw_match_path = match_path.parent / "raw_matches.h5"
-    if raw_match_path.exists():
-        add_raw_matches(
-            db,
-            raw_match_path,
-            fname_to_id,
-        )
+    
+    all_feature_h5_files = [file for file in feature_path.glob('./*') if "h5" in Path(file).suffix]
+    for feature_file in all_feature_h5_files:
+        fname_to_id = add_keypoints(db, feature_file, img_dir, camera_options)
+    
+    # raw_match_path = match_path.parent.parent / "raw_matches"
+    all_match_h5_files = [file for file in match_path.glob('./*') if "h5" in Path(file).suffix]
+    for match_file in all_match_h5_files:
+        if match_file.exists():
+            add_raw_matches(
+                db,
+                match_file,
+                fname_to_id,
+            )
     # if match_path.exists():
     #     add_matches(
     #         db,
@@ -370,8 +376,8 @@ if __name__ == "__main__":
         raise RuntimeError("database path already exists - will not modify it.")
 
     database_path = Path(args.database_path)
-    feature_path = Path(args.h5_path) / "features.h5"
-    match_path = Path(args.h5_path) / "raw_matches.h5"
+    feature_path = Path(args.h5_path) / "features"
+    match_path = Path(args.h5_path) / "raw_matches"
     imgs_dir = Path(args.image_path)
 
     export_to_colmap(

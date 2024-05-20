@@ -51,25 +51,30 @@ def get_features(
     for feature_file in all_h5_files:
         with h5py.File(str(feature_file), "r", libver="latest") as fd:
             if name in fd:
+                feats = {}
                 try:
                     kpts = np.array(fd[name]["keypoints"]).astype(np.float32)
                     descr = np.array(fd[name]["descriptors"]).astype(np.float32)
+                    feats["keypoints"] = kpts
+                    feats["descriptors"] = descr
                     scales=None
                     if "scales" in fd[name]:
                         scales = np.array(fd[name]["scales"]).astype(np.float32)
+                        feats["scales"] = scales
                     oris=None
                     if "oris" in fd[name]:
                         oris = np.array(fd[name]["oris"]).astype(np.float32)
+                        feats["oris"] = oris
 
                 except KeyError:
                     raise KeyError(f"Cannot find keypoints and descriptors in {path}")
 
-                feats = {
-                    "keypoints": kpts,
-                    "descriptors": descr,
-                    "scales": scales,
-                    "oris": oris,
-                }
+                # feats = {
+                #     "keypoints": kpts,
+                #     "descriptors": descr,
+                #     # "scales": scales,
+                #     # "oris": oris,
+                # }
 
                 if "feature_path" in fd[name]:
                     feats["feature_path"] = fd[name]["feature_path"][()].decode("utf-8")
