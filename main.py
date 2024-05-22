@@ -33,6 +33,9 @@ img_matching = ImageMatching(
     custom_config=config.as_dict(),
 )
 
+if config.general["matching_strategy"] == "none":
+    raise Exception('Cannout use none strategy')
+
 # Try to rotate images so they will be all "upright", useful for deep-learning approaches that usually are not rotation invariant
 if config.general["upright"]:
     img_matching.rotate_upright_images()
