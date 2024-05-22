@@ -45,11 +45,11 @@ conf_general = {
     #   GeometricVerification.NONE (no geometric verification),
     #   GeometricVerification.PYDEGENSAC (use pydegensac),
     #   GeometricVerification.MAGSAC (use opencv MAGSAC),
-    "geom_verification": GeometricVerification.PYDEGENSAC,
+    "geom_verification": GeometricVerification.MAGSAC,
     "gv_threshold": 4,
     "gv_confidence": 0.99999,
     # Minimum number of inliers matches and minumum inlier ratio per pair
-    "min_inliers_per_pair": 15,
+    "min_inliers_per_pair": 70,
     "min_inlier_ratio_per_pair": 0.25,
     # Even if the features are extracted by tiles, you can try to match the features of the entire image first (if the number of features is not too high and they can fit into memory). Default is False.
     "try_match_full_images": False,
@@ -123,7 +123,7 @@ confs = {
         "extractor": {
             "name": "aliked",
             "model_name": "aliked-n16rot",
-            "max_num_keypoints": 12000,
+            "max_num_keypoints": 8192,
             "detection_threshold": 0.167,
             "nms_radius": 3,
         },
