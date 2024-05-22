@@ -42,6 +42,7 @@ def export_to_colmap(
     img_dir: Path,
     feature_path: Path,
     match_path: Path,
+    verified_match_path: Path,
     database_path: str = "database.db",
     camera_options: dict = default_camera_options,
 ):
@@ -94,12 +95,14 @@ def export_to_colmap(
                 match_file,
                 fname_to_id,
             )
-    # if match_path.exists():
-    #     add_matches(
-    #         db,
-    #         match_path,
-    #         fname_to_id,
-    #     )
+    all_match_h5_files_verified = [file for file in verified_match_path.glob('./*') if "h5" in Path(file).suffix]
+    for match_file_verified in all_match_h5_files_verified:
+        if match_file_verified.exists():
+            add_matches(
+                db,
+                match_file_verified,
+                fname_to_id,
+            )
 
     db.commit()
     return
@@ -378,12 +381,14 @@ if __name__ == "__main__":
     database_path = Path(args.database_path)
     feature_path = Path(args.h5_path) / "features"
     match_path = Path(args.h5_path) / "raw_matches"
+    verified_matches = Path(args.h5_path) / "matches"
     imgs_dir = Path(args.image_path)
 
     export_to_colmap(
         img_dir=imgs_dir,
         feature_path=feature_path,
         match_path=match_path,
+        verified_match_path=verified_matches,
         database_path=database_path,
         camera_options=camera_options,
     )

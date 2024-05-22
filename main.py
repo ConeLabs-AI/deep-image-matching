@@ -33,119 +33,122 @@ img_matching = ImageMatching(
     custom_config=config.as_dict(),
 )
 
-if config.general["matching_strategy"] == "none":
-    # Try to rotate images so they will be all "upright", useful for deep-learning approaches that usually are not rotation invariant
-    if config.general["upright"]:
-        img_matching.rotate_upright_images()
-        timer.update("rotate_upright_images")
+# Try to rotate images so they will be all "upright", useful for deep-learning approaches that usually are not rotation invariant
+if config.general["upright"]:
+    img_matching.rotate_upright_images()
+    timer.update("rotate_upright_images")
 
-    # Extract features
-    feature_path = img_matching.extract_features()
-    timer.update("extract_features")
+# Extract features
+feature_path = img_matching.extract_features()
+timer.update("extract_features")
 
-else:
-    feature_path = config.general["output_dir"] / "features"
-    
-    # Generate pairs to be matched
-    pair_path = img_matching.generate_pairs()
-    timer.update("generate_pairs")
+feature_path = config.general["output_dir"] / "features"
 
-    # Matching
-    match_path = img_matching.match_pairs(feature_path)
-    timer.update("matching")
+# Generate pairs to be matched
+pair_path = img_matching.generate_pairs()
+timer.update("generate_pairs")
 
-    # If features have been extracted on "upright" images, this function bring features back to their original image orientation
-    if config.general["upright"]:
-        img_matching.rotate_back_features(feature_path)
-        timer.update("rotate_back_features")
+# Matching
+match_path = img_matching.match_pairs(feature_path)
+timer.update("matching")
 
-    # Export in colmap format
-    with open(config.general["camera_options"], "r") as file:
-        camera_options = yaml.safe_load(file)
-    database_path = output_dir / "database.db"
-    export_to_colmap(
+# If features have been extracted on "upright" images, this function bring features back to their original image orientation
+if config.general["upright"]:
+    img_matching.rotate_back_features(feature_path)
+    timer.update("rotate_back_features")
+
+# Export in colmap format
+with open(config.general["camera_options"], "r") as file:
+    camera_options = yaml.safe_load(file)
+database_path = output_dir / "database.db"
+feature_path = output_dir / "features"
+match_path = output_dir / "raw_matches"
+verified_matches = output_dir / "matches"
+
+export_to_colmap(
+    img_dir=imgs_dir,
+    feature_path=feature_path,
+    match_path=match_path,
+    verified_match_path=verified_matches,
+    database_path=database_path,
+    camera_options=camera_options,
+)
+timer.update("export_to_colmap")
+
+# Visualize view graph
+if config.general["graph"]:
+    try:
+        graph = import_module("deep_image_matching.graph")
+        graph.view_graph(database_path, output_dir, imgs_dir)
+        timer.update("show view graph")
+    except ImportError:
+        logger.error("pyvis is not available. Unable to visualize view graph.")
+
+# If --skip_reconstruction is not specified, run reconstruction
+# Export in openMVG format
+if config.general["openmvg_conf"]:
+    with open(config.general["openmvg_conf"], "r") as file:
+        openmvgcfg = yaml.safe_load(file)
+    openmvg_sfm_bin = openmvgcfg["general"]["path_to_binaries"]
+    openmvg_database = openmvgcfg["general"]["openmvg_database"]
+    openmvg_out_path = output_dir / "openmvg"
+
+    export_to_openmvg(
         img_dir=imgs_dir,
         feature_path=feature_path,
         match_path=match_path,
-        database_path=database_path,
+        openmvg_out_path=openmvg_out_path,
+        openmvg_sfm_bin=openmvg_sfm_bin,
+        openmvg_database=openmvg_database,
         camera_options=camera_options,
     )
-    timer.update("export_to_colmap")
+    timer.update("export_to_openMVG")
 
-    # Visualize view graph
-    if config.general["graph"]:
-        try:
-            graph = import_module("deep_image_matching.graph")
-            graph.view_graph(database_path, output_dir, imgs_dir)
-            timer.update("show view graph")
-        except ImportError:
-            logger.error("pyvis is not available. Unable to visualize view graph.")
+    # Reconstruction with OpenMVG
+    reconstruction = import_module("deep_image_matching.openmvg_reconstruction")
+    reconstruction.main(
+        openmvg_out_path=openmvg_out_path,
+        skip_reconstruction=config.general["skip_reconstruction"],
+        openmvg_sfm_bin=openmvg_sfm_bin,
+    )
 
-    # If --skip_reconstruction is not specified, run reconstruction
-    # Export in openMVG format
-    if config.general["openmvg_conf"]:
-        with open(config.general["openmvg_conf"], "r") as file:
-            openmvgcfg = yaml.safe_load(file)
-        openmvg_sfm_bin = openmvgcfg["general"]["path_to_binaries"]
-        openmvg_database = openmvgcfg["general"]["openmvg_database"]
-        openmvg_out_path = output_dir / "openmvg"
+    timer.update("SfM with openMVG")
 
-        export_to_openmvg(
-            img_dir=imgs_dir,
-            feature_path=feature_path,
-            match_path=match_path,
-            openmvg_out_path=openmvg_out_path,
-            openmvg_sfm_bin=openmvg_sfm_bin,
-            openmvg_database=openmvg_database,
-            camera_options=camera_options,
+# Reconstruction with pycolmap
+if not config.general["skip_reconstruction"]:
+    use_pycolmap = True
+    try:
+        # To be sure, check if pycolmap is available, otherwise skip reconstruction
+        pycolmap = import_module("pycolmap")
+        logger.info(f"Using pycolmap version {pycolmap.__version__}")
+    except ImportError:
+        logger.error("Pycomlap is not available.")
+        use_pycolmap = False
+
+    if use_pycolmap:
+        # import reconstruction module
+        reconstruction = import_module("deep_image_matching.reconstruction")
+
+        # Optional - You can specify some reconstruction configuration
+        # reconst_opts = (
+        #     {
+        #         "ba_refine_focal_length": True,
+        #         "ba_refine_principal_point": False,
+        #         "ba_refine_extra_params": False,
+        #     },
+        # )
+        reconst_opts = {}
+
+        # Run reconstruction
+        model = reconstruction.main(
+            database=output_dir / "database.db",
+            image_dir=imgs_dir,
+            sfm_dir=output_dir,
+            reconst_opts=reconst_opts,
+            verbose=config.general["verbose"],
         )
-        timer.update("export_to_openMVG")
 
-        # Reconstruction with OpenMVG
-        reconstruction = import_module("deep_image_matching.openmvg_reconstruction")
-        reconstruction.main(
-            openmvg_out_path=openmvg_out_path,
-            skip_reconstruction=config.general["skip_reconstruction"],
-            openmvg_sfm_bin=openmvg_sfm_bin,
-        )
-
-        timer.update("SfM with openMVG")
-
-    # Reconstruction with pycolmap
-    if not config.general["skip_reconstruction"]:
-        use_pycolmap = True
-        try:
-            # To be sure, check if pycolmap is available, otherwise skip reconstruction
-            pycolmap = import_module("pycolmap")
-            logger.info(f"Using pycolmap version {pycolmap.__version__}")
-        except ImportError:
-            logger.error("Pycomlap is not available.")
-            use_pycolmap = False
-
-        if use_pycolmap:
-            # import reconstruction module
-            reconstruction = import_module("deep_image_matching.reconstruction")
-
-            # Optional - You can specify some reconstruction configuration
-            # reconst_opts = (
-            #     {
-            #         "ba_refine_focal_length": True,
-            #         "ba_refine_principal_point": False,
-            #         "ba_refine_extra_params": False,
-            #     },
-            # )
-            reconst_opts = {}
-
-            # Run reconstruction
-            model = reconstruction.main(
-                database=output_dir / "database.db",
-                image_dir=imgs_dir,
-                sfm_dir=output_dir,
-                reconst_opts=reconst_opts,
-                verbose=config.general["verbose"],
-            )
-
-            timer.update("pycolmap reconstruction")
+        timer.update("pycolmap reconstruction")
 
 # Print timing
 timer.print("Deep Image Matching")

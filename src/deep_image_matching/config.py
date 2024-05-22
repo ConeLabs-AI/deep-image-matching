@@ -124,7 +124,7 @@ confs = {
             "name": "aliked",
             "model_name": "aliked-n16rot",
             "max_num_keypoints": 12000,
-            "detection_threshold": 0.067,
+            "detection_threshold": 0.167,
             "nms_radius": 3,
         },
         "matcher": {
