@@ -89,18 +89,19 @@ def get_features(
                 k = "image_size"
                 if k in fd[name]:
                     feats[k] = np.array(fd[name][k]).astype(np.int32)
-            else:
-                raise ValueError(f"Cannot find image {name} in {path}")
 
-            if as_tensor:
-                if device.type == "cuda" and not torch.cuda.is_available():
-                    device = torch.device("cpu")
-                feats = {
-                    k: torch.tensor(v, dtype=torch.float, device=device)
-                    for k, v in feats.items()
-                }
+    if feats == {}:
+        raise ValueError(f"Cannot find image {name} in {path}")
+        
+    if as_tensor:
+        if device.type == "cuda" and not torch.cuda.is_available():
+            device = torch.device("cpu")
+        feats = {
+            k: torch.tensor(v, dtype=torch.float, device=device)
+            for k, v in feats.items()
+        }
 
-            return feats
+    return feats
 
 
 def get_keypoints(

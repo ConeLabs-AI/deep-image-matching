@@ -8,6 +8,7 @@ import cv2
 import h5py
 import numpy as np
 import torch
+import os
 
 from deep_image_matching.extractors.extractor_base import ExtractorBase
 
