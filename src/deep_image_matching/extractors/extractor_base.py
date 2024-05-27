@@ -190,6 +190,11 @@ class ExtractorBase(metaclass=ABCMeta):
         output_dir = Path(self._config["general"]["output_dir"])
         feature_path = output_dir / "features" / f"features_{Path(img.img_list_file).stem}.h5"
 
+        if os.path.exists(str(feature_path)):
+            with h5py.File(str(feature_path), "r", libver="latest") as fd:
+                if im_path.name in fd:
+                    return feature_path
+
         # Load image
         image = cv2.imread(str(im_path))
         if self.grayscale:

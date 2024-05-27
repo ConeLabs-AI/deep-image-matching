@@ -239,6 +239,14 @@ class MatcherBase(metaclass=ABCMeta):
         # Get features from h5 file
         img0_name = img0.name
         img1_name = img1.name
+
+        if os.path.exists(str(raw_matches_path)):
+            with h5py.File(str(raw_matches_path), "r", libver="latest") as hfile:
+                if img0_name in hfile:
+                    group = hfile[img0_name]
+                    if img1_name in group:
+                        return group[img1_name][()]
+                        
         features0 = get_features(self._feature_dir, img0.name)
         features1 = get_features(self._feature_dir, img1.name)
         timer_match.update("load h5 features")
