@@ -48,10 +48,10 @@ def get_features(
     device: torch.device = torch.device("cuda"),
 ) -> dict:
     all_h5_files = [file for file in path.glob('./*') if "h5" in Path(file).suffix]
+    feats = {}
     for feature_file in all_h5_files:
         with h5py.File(str(feature_file), "r", libver="latest") as fd:
             if name in fd:
-                feats = {}
                 try:
                     kpts = np.array(fd[name]["keypoints"]).astype(np.float32)
                     descr = np.array(fd[name]["descriptors"]).astype(np.float32)
@@ -92,7 +92,7 @@ def get_features(
 
     if feats == {}:
         raise ValueError(f"Cannot find image {name} in {path}")
-        
+
     if as_tensor:
         if device.type == "cuda" and not torch.cuda.is_available():
             device = torch.device("cpu")
