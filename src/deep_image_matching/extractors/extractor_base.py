@@ -204,14 +204,15 @@ class ExtractorBase(metaclass=ABCMeta):
 
         # Resize images if needed
         image_ = self._resize_image(self._quality, image, interp=self.interp)
-
-        mask_img = []
+        mask_img_thres = np.full(image.shape, 255)
         if self._config["general"]["mask_path"] != "":
-            mask_img = cv2.imread(os.path.join(self._config["general"]["mask_path"], os.path.basename(f"{str(im_path)}.png")))
-            mask_img = cv2.cvtColor(mask_img, cv2.COLOR_BGR2GRAY)
-            mask_img = self._resize_image(self._quality, mask_img, interp=self.interp)
-            # ret, mask_img_thres = cv2.threshold(mask_img, 127, 255, cv2.THRESH_BINARY)
-            mask_img_thres = mask_img>127
+            mask_img_path = os.path.join(self._config["general"]["mask_path"], os.path.basename(f"{str(im_path)}.png"))
+            if os.path.exists(mask_img_path):
+                mask_img = cv2.imread(mask_img_path)
+                mask_img = cv2.cvtColor(mask_img, cv2.COLOR_BGR2GRAY)
+                mask_img = self._resize_image(self._quality, mask_img, interp=self.interp)
+                # ret, mask_img_thres = cv2.threshold(mask_img, 127, 255, cv2.THRESH_BINARY)
+                mask_img_thres = mask_img>127
 
         if self._config["general"]["tile_selection"] == TileSelection.NONE:
             # Extract features from the whole image

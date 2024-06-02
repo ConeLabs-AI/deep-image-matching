@@ -29,6 +29,8 @@ import yaml
 
 from deep_image_matching import logger
 from deep_image_matching.utils.database import COLMAPDatabase, image_ids_to_pair_id
+from deep_image_matching.io.colmap_read_write_model import read_model, write_model, Point3D
+from deep_image_matching.io.colmap_read_write_model import Image as Image_colmap
 
 default_camera_options = {
     "general": {
@@ -82,9 +84,14 @@ def export_to_colmap(
     db = COLMAPDatabase.connect(database_path)
     db.create_tables()
     
+    grouped_images = parse_camera_options(camera_options, db, img_dir)
+    fname_to_id = {}
+    raw_matches_added = set()
+    matches_added = set()
+
     all_feature_h5_files = [file for file in feature_path.glob('./*') if "h5" in Path(file).suffix]
     for feature_file in all_feature_h5_files:
-        fname_to_id = add_keypoints(db, feature_file, img_dir, camera_options)
+        fname_to_id = add_keypoints(db, feature_file, img_dir, camera_options, fname_to_id, grouped_images)
     
     # raw_match_path = match_path.parent.parent / "raw_matches"
     all_match_h5_files = [file for file in match_path.glob('./*') if "h5" in Path(file).suffix]
@@ -94,7 +101,85 @@ def export_to_colmap(
                 db,
                 match_file,
                 fname_to_id,
+                raw_matches_added
             )
+    # all_match_h5_files_verified = [file for file in verified_match_path.glob('./*') if "h5" in Path(file).suffix]
+    # for match_file_verified in all_match_h5_files_verified:
+    #     if match_file_verified.exists():
+    #         add_matches(
+    #             db,
+    #             match_file_verified,
+    #             fname_to_id,
+    #             matches_added
+    #         )
+
+    db.commit()
+    return
+
+def export_to_colmap_modify_model(
+    img_dir: Path,
+    feature_path: Path,
+    match_path: Path,
+    verified_match_path: Path,
+    database_path: str = "database.db",
+    camera_options: dict = default_camera_options,
+):
+    """
+    Exports image features and matches to a COLMAP database.
+
+    Args:
+        img_dir (str): Path to the directory containing the source images.
+        feature_path (Path): Path to the feature file (in HDF5 format) containing the extracted keypoints.
+        match_path (Path): Path to the match file (in HDF5 format) containing the matches between keypoints.
+        database_path (str, optional): Path to the COLMAP database file. Defaults to "colmap.db".
+        camera_options (dict, optional): Flag indicating whether to use camera options. Defaults to default_camera_options.
+
+    Returns:
+        None
+
+    Raises:
+        IOError: If the image path is invalid.
+
+    Warnings:
+        If the database path already exists, it will be deleted and recreated.
+        If a pair of images already has matches in the database, a warning will be raised.
+
+    Example:
+        export_to_colmap(
+            img_dir="/path/to/images",
+            feature_path=Path("/path/to/features.h5"),
+            match_path=Path("/path/to/matches.h5"),
+            database_path="colmap.db",
+        )
+    """
+    database_path = Path(database_path)
+    if database_path.exists():
+        logger.warning(f"Database path {database_path} already exists - deleting it")
+        database_path.unlink()
+
+    db = COLMAPDatabase.connect(database_path)
+    db.create_tables()
+    
+    fname_to_id = {}
+    raw_matches_added = set()
+    matches_added = set()
+    
+    # all_feature_h5_files = [file for file in feature_path.glob('./*') if "h5" in Path(file).suffix]
+    grouped_images = parse_camera_options(camera_options, db, img_dir)
+    all_h5_files = os.listdir(feature_path)
+    for h5_file in all_h5_files:
+        fname_to_id = add_keypoints(db, Path(feature_path) / h5_file, img_dir, camera_options, fname_to_id, grouped_images)
+
+    all_match_h5_files = [file for file in match_path.glob('./*') if "h5" in Path(file).suffix]
+    for match_file in all_match_h5_files:
+        if match_file.exists():
+            add_raw_matches(
+                db,
+                match_file,
+                fname_to_id,
+                raw_matches_added
+            )
+
     all_match_h5_files_verified = [file for file in verified_match_path.glob('./*') if "h5" in Path(file).suffix]
     for match_file_verified in all_match_h5_files_verified:
         if match_file_verified.exists():
@@ -102,11 +187,62 @@ def export_to_colmap(
                 db,
                 match_file_verified,
                 fname_to_id,
+                matches_added
             )
+
+    colmap_models = os.listdir(str(Path(feature_path).parents[1] / "colmap_models"))
+    for model in colmap_models:
+        cameras, images_1, points3D_1 = read_model(
+            path=os.path.join(str(Path(feature_path).parents[1] / "colmap_models"), model), ext=".bin"
+        )
+
+        print("num_images:", len(images_1))
+        print("num_points3D:", len(points3D_1))
+
+
+        good_imgs_1 = {}  
+        good_points_1 = {}
+        good_imgs_1_map = {}
+
+        for img in images_1:
+            good_imgs_1[fname_to_id[images_1[img].name]] = Image_colmap(
+                    id=fname_to_id[images_1[img].name],
+                    qvec=images_1[img].qvec,
+                    tvec=images_1[img].tvec,
+                    camera_id=images_1[img].camera_id,
+                    name=images_1[img].name,
+                    xys=np.array([]),
+                    point3D_ids=np.array([]),
+                )
+            good_imgs_1_map[img] = fname_to_id[images_1[img].name]
+
+        # for point in points3D_1:
+        #     new_img_ids = []
+        #     for img in points3D_1[point].image_ids:
+        #         new_img_ids.append(good_imgs_1_map[img])
+        #     good_points_1[point] = Point3D(
+        #         id=point,
+        #         xyz=points3D_1[point].xyz,
+        #         rgb=points3D_1[point].rgb,
+        #         error=points3D_1[point].error,
+        #         image_ids=np.array(new_img_ids),
+        #         point2D_idxs=points3D_1[point].point2D_idxs,
+        #     )
+
+        if not os.path.exists(os.path.join(str(Path(feature_path).parents[1] / "colmap_models_renamed"), model)):
+            os.mkdir(os.path.join(str(Path(feature_path).parents[1] / "colmap_models_renamed"), model))
+
+        print(f"Writing model: {os.path.join(str(Path(feature_path).parents[1] / 'colmap_models_renamed'), model)}")
+        write_model(
+            cameras,
+            good_imgs_1,
+            good_points_1,
+            path=os.path.join(str(Path(feature_path).parents[1] / "colmap_models_renamed"), model),
+            ext=".bin",
+        )
 
     db.commit()
     return
-
 
 def get_focal(image_path: Path, err_on_default: bool = False) -> float:
     """
@@ -217,7 +353,7 @@ def parse_camera_options(
 
 
 def add_keypoints(
-    db: Path, h5_path: Path, image_path: Path, camera_options: dict = {}
+    db: Path, h5_path: Path, image_path: Path, camera_options: dict = {}, fname_to_id: dict = {}, grouped_images = None
 ) -> dict:
     """
     Adds keypoints from an HDF5 file to a COLMAP database.
@@ -236,11 +372,11 @@ def add_keypoints(
         dict: A dictionary mapping image filenames to their corresponding image IDs in the database.
     """
 
-    grouped_images = parse_camera_options(camera_options, db, image_path)
+    if grouped_images == None:
+        grouped_images = parse_camera_options(camera_options, db, image_path)
 
     with h5py.File(str(h5_path), "r") as keypoint_f:
         # camera_id = None
-        fname_to_id = {}
         k = 0
         for filename in tqdm(list(keypoint_f.keys())):
             keypoints = keypoint_f[filename]["keypoints"].__array__()
@@ -279,7 +415,7 @@ def add_keypoints(
     return fname_to_id
 
 
-def add_raw_matches(db: Path, h5_path: Path, fname_to_id: dict):
+def add_raw_matches(db: Path, h5_path: Path, fname_to_id: dict, added: set):
     """
     Adds raw feature matches from an HDF5 file to a COLMAP database.
 
@@ -294,7 +430,6 @@ def add_raw_matches(db: Path, h5_path: Path, fname_to_id: dict):
     """
     match_file = h5py.File(str(h5_path), "r")
 
-    added = set()
     n_keys = len(match_file.keys())
     n_total = (n_keys * (n_keys - 1)) // 2
 
@@ -320,10 +455,9 @@ def add_raw_matches(db: Path, h5_path: Path, fname_to_id: dict):
     match_file.close()
 
 
-def add_matches(db, h5_path, fname_to_id):
+def add_matches(db, h5_path, fname_to_id, added: set):
     match_file = h5py.File(str(h5_path), "r")
 
-    added = set()
     n_keys = len(match_file.keys())
     n_total = (n_keys * (n_keys - 1)) // 2
 
