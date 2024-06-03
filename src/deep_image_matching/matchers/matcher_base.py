@@ -317,56 +317,56 @@ class MatcherBase(metaclass=ABCMeta):
         timer_match.update("save to h5")
         timer_match.print(f"{__class__.__name__} match")
 
-        # Do Geometric verification
-        # Rescale threshold according the image qualit
-        if len(matches) < 8:
-            logger.debug(
-                f"Too few matches found ({len(matches)}). Skipping image pair {img0.name}-{img1.name}"
-            )
-            return None
+        # # Do Geometric verification
+        # # Rescale threshold according the image qualit
+        # if len(matches) < 8:
+        #     logger.debug(
+        #         f"Too few matches found ({len(matches)}). Skipping image pair {img0.name}-{img1.name}"
+        #     )
+        #     return None
 
-        scales = {
-            Quality.HIGHEST: 1.0,
-            Quality.HIGH: 1.0,
-            Quality.MEDIUM: 1.5,
-            Quality.LOW: 2.0,
-            Quality.LOWEST: 3.0,
-        }
-        gv_threshold = (
-            self._config["general"]["gv_threshold"]
-            * scales[self._config["general"]["quality"]]
-        )
+        # scales = {
+        #     Quality.HIGHEST: 1.0,
+        #     Quality.HIGH: 1.0,
+        #     Quality.MEDIUM: 1.5,
+        #     Quality.LOW: 2.0,
+        #     Quality.LOWEST: 3.0,
+        # }
+        # gv_threshold = (
+        #     self._config["general"]["gv_threshold"]
+        #     * scales[self._config["general"]["quality"]]
+        # )
 
-        # Apply geometric verification
-        _, inlMask = geometric_verification(
-            kpts0=features0["keypoints"][matches[:, 0]],
-            kpts1=features1["keypoints"][matches[:, 1]],
-            method=self._config["general"]["geom_verification"],
-            threshold=gv_threshold,
-            confidence=self._config["general"]["gv_confidence"],
-        )
-        num_inliers = np.sum(inlMask)
-        inliers_ratio = num_inliers / len(matches)
-        matches = matches[inlMask]
+        # # Apply geometric verification
+        # _, inlMask = geometric_verification(
+        #     kpts0=features0["keypoints"][matches[:, 0]],
+        #     kpts1=features1["keypoints"][matches[:, 1]],
+        #     method=self._config["general"]["geom_verification"],
+        #     threshold=gv_threshold,
+        #     confidence=self._config["general"]["gv_confidence"],
+        # )
+        # num_inliers = np.sum(inlMask)
+        # inliers_ratio = num_inliers / len(matches)
+        # matches = matches[inlMask]
 
-        if num_inliers < self.min_inliers_per_pair:
-            logger.debug(
-                f"Too few inliers matches found ({num_inliers}). Skipping image pair {img0.name}-{img1.name}"
-            )
-            timer_match.print(f"{__class__.__name__} match")
-            return None
-        elif inliers_ratio < self.min_inlier_ratio_per_pair:
-            logger.debug(
-                f"Too small inlier ratio ({inliers_ratio*100:.2f}%). Skipping image pair {img0.name}-{img1.name}"
-            )
-            timer_match.print(f"{__class__.__name__} match")
-            return None
-        timer_match.update("Geom. verification")
+        # if num_inliers < self.min_inliers_per_pair:
+        #     logger.debug(
+        #         f"Too few inliers matches found ({num_inliers}). Skipping image pair {img0.name}-{img1.name}"
+        #     )
+        #     timer_match.print(f"{__class__.__name__} match")
+        #     return None
+        # elif inliers_ratio < self.min_inlier_ratio_per_pair:
+        #     logger.debug(
+        #         f"Too small inlier ratio ({inliers_ratio*100:.2f}%). Skipping image pair {img0.name}-{img1.name}"
+        #     )
+        #     timer_match.print(f"{__class__.__name__} match")
+        #     return None
+        # timer_match.update("Geom. verification")
 
-        # Save to h5 file
-        with h5py.File(str(matches_path), "a", libver="latest") as fd:
-            group = fd.require_group(img0_name)
-            group.create_dataset(img1_name, data=matches)
+        # # Save to h5 file
+        # with h5py.File(str(matches_path), "a", libver="latest") as fd:
+        #     group = fd.require_group(img0_name)
+        #     group.create_dataset(img1_name, data=matches)
 
         timer_match.update("save to h5")
         timer_match.print(f"{__class__.__name__} match")

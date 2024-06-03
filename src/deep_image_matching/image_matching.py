@@ -20,7 +20,7 @@ from . import (
 )
 from .extractors.extractor_base import extractor_loader
 from .extractors.superpoint import SuperPointExtractor
-from .io.h5 import get_features
+from .io.h5 import get_features, search_matches
 from .matchers.lightglue import LightGlueMatcher
 from .matchers.matcher_base import matcher_loader
 from .pairs_generator import PairsGenerator
@@ -422,6 +422,13 @@ class ImageMatching:
         for i, pair in enumerate(tqdm(self.pairs)):
             name0 = pair[0].name if isinstance(pair[0], Path) else pair[0]
             name1 = pair[1].name if isinstance(pair[1], Path) else pair[1]
+
+            match_exist = search_matches(self.output_dir / "matches", name0, name1)
+            
+            if match_exist:
+                logger.debug(f"Existing image pair: {name0} - {name1}")
+                continue
+
             im0 = self.image_dir / name0
             im1 = self.image_dir / name1
 

@@ -115,6 +115,21 @@ def get_keypoints(
         return p, uncertainty
     return p
 
+def search_matches(matches_dir: Path, name0: str, name1: str) -> np.ndarray:
+    all_h5_files = [file for file in matches_dir.glob('./*') if "h5" in Path(file).suffix]
+    feats = {}
+    for match_file in all_h5_files:
+        with h5py.File(str(match_file), "r", libver="latest") as hfile:
+            if name0 in hfile:
+                group = hfile[name0]
+                if name1 in group:
+                    return True
+            if name1 in hfile:
+                group = hfile[name1]
+                if name0 in group:
+                    return True
+
+    return False
 
 def get_matches(path: Path, name0: str, name1: str) -> np.ndarray:
     with h5py.File(str(path), "r", libver="latest") as hfile:
