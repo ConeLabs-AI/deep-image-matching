@@ -68,14 +68,14 @@ feature_path = output_dir / "features"
 match_path = output_dir / "raw_matches"
 verified_matches = output_dir / "matches"
 
-export_to_colmap(
-    img_dir=imgs_dir,
-    feature_path=feature_path,
-    match_path=match_path,
-    verified_match_path=verified_matches,
-    database_path=database_path,
-    camera_options=camera_options,
-)
+# export_to_colmap(
+#     img_dir=imgs_dir,
+#     feature_path=feature_path,
+#     match_path=match_path,
+#     verified_match_path=verified_matches,
+#     database_path=database_path,
+#     camera_options=camera_options,
+# )
 timer.update("export_to_colmap")
 
 # Visualize view graph

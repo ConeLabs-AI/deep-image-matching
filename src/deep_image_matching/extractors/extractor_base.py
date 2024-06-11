@@ -415,7 +415,15 @@ class ExtractorBase(metaclass=ABCMeta):
             interp = "cv2_cubic"
         if quality == Quality.HIGH:
             return image  # No resize
-        new_size = get_size_by_quality(quality, image.shape[:2])
+        if quality == Quality.MEDIUM:
+            downscale_ratio = 1
+            if image.shape[0] > image.shape[1] and image.shape[0] > 3200:
+                downscale_ratio = 3200/image.shape[0]
+            elif image.shape[1] > image.shape[0] and image.shape[1] > 3200:
+                downscale_ratio = 3200/image.shape[1]
+            new_size = (int(image.shape[0] * downscale_ratio), int(image.shape[1] * downscale_ratio))
+        else:
+            new_size = get_size_by_quality(quality, image.shape[:2])
         return resize_image(image, (new_size[1], new_size[0]), interp=interp)
 
     def _resize_features(
