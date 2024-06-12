@@ -203,7 +203,7 @@ class ExtractorBase(metaclass=ABCMeta):
             image = image.astype(np.float32)
 
         # Resize images if needed
-        image_ = self._resize_image(self._quality, image, interp=self.interp)
+        ratio, image_ = self._resize_image(self._quality, image, interp=self.interp)
 
         mask_img_thres = np.full((image_.shape[0], image_.shape[1]), True)
         if self._config["general"]["mask_path"] != "":
@@ -211,7 +211,7 @@ class ExtractorBase(metaclass=ABCMeta):
             if os.path.exists(mask_img_path):
                 mask_img = cv2.imread(mask_img_path)
                 mask_img = cv2.cvtColor(mask_img, cv2.COLOR_BGR2GRAY)
-                mask_img = self._resize_image(self._quality, mask_img, interp=self.interp)
+                ratio, mask_img = self._resize_image(self._quality, mask_img, interp=self.interp)
                 # ret, mask_img_thres = cv2.threshold(mask_img, 127, 255, cv2.THRESH_BINARY)
                 mask_img_thres = mask_img>127
         
@@ -220,7 +220,7 @@ class ExtractorBase(metaclass=ABCMeta):
             features = self._extract(image_, mask_img_thres)
             
             # Retrieve original image coordinates if matching was performed on up/down-sampled images
-            features = self._resize_features(self._quality, features)
+            features = self._resize_features(self._quality, ratio, features)
             
             # del_idx = [feat_idx for feat_idx, pix_cord in enumerate(features['keypoints']) if mask_img[int(pix_cord[1]), int(pix_cord[0])] < 255]
             # for item in features:
@@ -411,12 +411,12 @@ class ExtractorBase(metaclass=ABCMeta):
 
         """
         # If quality is HIGHEST, force interpolation to cv2_cubic
+        downscale_ratio = 1
         if quality == Quality.HIGHEST:
             interp = "cv2_cubic"
         if quality == Quality.HIGH:
             return image  # No resize
         if quality == Quality.MEDIUM:
-            downscale_ratio = 1
             if image.shape[0] > image.shape[1] and image.shape[0] > 3200:
                 downscale_ratio = 3200/image.shape[0]
             elif image.shape[1] > image.shape[0] and image.shape[1] > 3200:
@@ -424,10 +424,10 @@ class ExtractorBase(metaclass=ABCMeta):
             new_size = (int(image.shape[0] * downscale_ratio), int(image.shape[1] * downscale_ratio))
         else:
             new_size = get_size_by_quality(quality, image.shape[:2])
-        return resize_image(image, (new_size[1], new_size[0]), interp=interp)
+        return downscale_ratio, resize_image(image, (new_size[1], new_size[0]), interp=interp)
 
     def _resize_features(
-        self, quality: Quality, features: FeaturesDict
+        self, quality: Quality, ratio: float, features: FeaturesDict
     ) -> Tuple[FeaturesDict]:
         """
         Resize features based on the specified quality.
@@ -445,7 +445,7 @@ class ExtractorBase(metaclass=ABCMeta):
         elif quality == Quality.HIGH:
             pass
         elif quality == Quality.MEDIUM:
-            features["keypoints"] *= 2
+            features["keypoints"] *= 1/ratio
         elif quality == Quality.LOW:
             features["keypoints"] *= 4
         elif quality == Quality.LOWEST:
